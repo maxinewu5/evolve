@@ -1,0 +1,581 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Authorization Page</title>
+    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+    <style type="text/css">
+      #login, #loggedin {
+        display: none;
+      }
+      .text-overflow {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        width: 500px;
+      }
+      #obtain-new-token {
+        visibility: hidden;
+      }
+
+      * {box-sizing:border-box}
+
+    /* Slideshow container */
+    .slideshow-container {
+      max-width: 1000px;
+      height: 500px;
+      position: relative;
+      margin: auto;
+    }
+
+    /* Hide the images by default */
+    .mySlides {
+      display: none;
+    }
+
+    /* Next & previous buttons */
+    .prev, .next {
+      cursor: pointer;
+      position: absolute;
+      top: 50%;
+      width: auto;
+      margin-top: -22px;
+      padding: 16px;
+      color: black;
+      font-weight: bold;
+      font-size: 18px;
+      transition: 0.6s ease;
+      border-radius: 0 3px 3px 0;
+      user-select: none;
+    }
+
+    /* Position the "next button" to the right */
+    .next {
+      right: 0;
+      border-radius: 3px 0 0 3px;
+    }
+
+    /* On hover, add a black background color with a little bit see-through */
+    .prev:hover, .next:hover {
+      background-color: rgba(0,0,0,0.8);
+    }
+
+    /* Caption text */
+    .text {
+      color: black;
+      font-size: 15px;
+      padding: 8px 12px;
+      position: absolute;
+      bottom: 8px;
+      width: 100%;
+      text-align: center;
+    }
+
+    /* Number text (1/3 etc) */
+    .numbertext {
+      color: black;
+      font-size: 12px;
+      padding: 8px 12px;
+      position: absolute;
+      top: 0;
+    }
+
+    /* The dots/bullets/indicators */
+    .dot {
+      cursor: pointer;
+      height: 15px;
+      width: 15px;
+      margin: 0 2px;
+      background-color: #bbb;
+      border-radius: 50%;
+      display: inline-block;
+      transition: background-color 0.6s ease;
+    }
+
+    .active, .dot:hover {
+      background-color: #717171;
+    }
+
+    /* Fading animation */
+    .fade {
+      -webkit-animation-name: fade;
+      -webkit-animation-duration: 1.5s;
+      animation-name: fade;
+      animation-duration: 1.5s;
+    }
+
+    @-webkit-keyframes fade {
+      from {opacity: .4}
+      to {opacity: 1}
+    }
+
+    @keyframes fade {
+      from {opacity: .4}
+      to {opacity: 1}
+    }
+
+    #headers {
+      width: 100%;
+      background-color: blue;
+    }
+
+
+    body {
+      background-color: dodgerblue;
+    }
+    #title {
+      color: white;
+      font-family:Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+    }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+
+      <div id="login">
+        <h1 id="title">Evolve</h1>
+        <a href="/login" class="btn btn-primary">LOGIN</a>
+      </div>
+
+      <div id="loggedin">
+
+        <div id="headers">
+          <h1>Evolve</h1>
+          <p>Evolve tells you how your listening history has changed over the years.</p>
+          <button class="btn btn-default" id="getTopSongs">Find your evolution!</button>
+        </div>
+
+        <!--
+          <div id="short_term_graph"></div>
+          <div id="medium_term_graph"></div>
+          <div id="long_term_graph"></div>
+        -->
+
+        <div class="slideshow-container">
+          <div class="mySlides fade">
+            <div class="numbertext">Short Term</div>
+            <div id="short_term_graph"></div>
+          </div>
+        
+          <div class="mySlides fade">
+            <div class="numbertext">Medium Term</div>
+            <div id="medium_term_graph"></div>
+          </div>
+        
+          <div class="mySlides fade">
+            <div class="numbertext">Long Term</div>
+            <div id="long_term_graph"></div>
+          </div>
+          <!-- Next and previous buttons -->
+          <a class="prev" onclick="plusSlides(-1)">&#10094;</a>
+          <a class="next" onclick="plusSlides(1)">&#10095;</a>
+        </div>
+        <br>
+        
+        <!-- The dots/circles -->
+        <div style="text-align:center">
+          <span class="dot" onclick="currentSlide(1)"></span>
+          <span class="dot" onclick="currentSlide(2)"></span>
+          <span class="dot" onclick="currentSlide(3)"></span>
+        </div>
+        <br>
+        <div id="oauth">
+        </div>
+        <button class="btn btn-default" id="obtain-new-token">Obtain new token using the refresh token</button>
+      </div>
+    </div>
+    
+    <script id="oauth-template" type="text/x-handlebars-template">
+      <h3>oAuth info</h3>
+      <dl class="dl-horizontal">
+        <dt>Access token</dt><dd class="text-overflow">{{access_token}}</dd>
+        <dt>Refresh token</dt><dd class="text-overflow">{{refresh_token}}</dd>
+      </dl>
+    </script>
+
+    <script src="//cdnjs.cloudflare.com/ajax/libs/handlebars.js/2.0.0-alpha.1/handlebars.min.js"></script>
+    <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <script>
+      
+      (function() {
+
+        /**
+         * Obtains parameters from the hash of the URL
+         * @return Object
+         */
+        function getHashParams() {
+          var hashParams = {};
+          var e, r = /([^&;=]+)=?([^&;]*)/g,
+              q = window.location.hash.substring(1);
+          while ( e = r.exec(q)) {
+             hashParams[e[1]] = decodeURIComponent(e[2]);
+          }
+          return hashParams;
+        }
+        /*
+        var oauthSource = document.getElementById('oauth-template').innerHTML,
+            oauthTemplate = Handlebars.compile(oauthSource),
+            oauthPlaceholder = document.getElementById('oauth');
+        */
+        var params = getHashParams();
+
+        var access_token = params.access_token,
+            refresh_token = params.refresh_token,
+            error = params.error;
+
+        if (error) {
+          alert('There was an error during the authentication');
+        } else {
+          if (access_token) {
+            // render oauth info
+            /*
+            oauthPlaceholder.innerHTML = oauthTemplate({
+              access_token: access_token,
+              refresh_token: refresh_token
+            });
+            */
+
+            $.ajax({
+                url: 'https://api.spotify.com/v1/me',
+                headers: {
+                  'Authorization': 'Bearer ' + access_token
+                },
+                success: function(response) {
+                  $('#login').hide();
+                  $('#loggedin').show();
+                }
+            });
+          } else {
+              // render initial screen
+              $('#login').show();
+              $('#loggedin').hide();
+          }
+
+
+
+          //function to get user id
+          function getId() {
+            var curid;
+            $.ajax({
+              type: 'GET',
+              url: 'https://api.spotify.com/v1/me',
+              dataType: 'json',
+              contentType: 'application/json',
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              },
+              async: false,
+              success: function(response) {
+                console.log("user id 1:" + response.id);
+                curid = response.id;
+              }
+            });
+            return curid;
+          }
+
+          document.getElementById('obtain-new-token').addEventListener('click', function() {
+            $.ajax({
+              url: '/refresh_token',
+              data: {
+                'refresh_token': refresh_token
+              }
+            }).done(function(data) {
+              access_token = data.access_token;
+              oauthPlaceholder.innerHTML = oauthTemplate({
+                access_token: access_token,
+                refresh_token: refresh_token
+              });
+            });
+          }, false);
+
+          function getFeaturesTrack(track) {
+            $.ajax({
+              type: 'GET',
+              url: 'https://api.spotify.com/v1/audio-features/' + track,
+              contentType: 'application/json',
+              dataType: 'json',
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              },
+              async: false,
+              success: function(result){
+                console.log(result);
+              }
+            })
+          }
+
+          function getFeaturesTracks(tracks) {
+            var featureData;
+            var tracks_string = "ids=";
+            tracks_string += tracks[0];
+            for (var i = 1; i < tracks.length; i++) {
+              tracks_string += ",";
+              tracks_string += tracks[i];
+            }
+            console.log(tracks_string);
+            $.ajax({
+              type: 'GET',
+              url: "https://api.spotify.com/v1/audio-features/?" + tracks,
+              contentType: 'application/json',
+              dataType: 'json',
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              },
+              data: tracks_string,
+              async: false,
+              success: function(result){
+                console.log(result);
+                featureData = result.audio_features;
+              }
+            })
+            return featureData;
+          }
+
+          function getUserTopSongs(limit, offset, time_range) {
+            var songs = [];
+            $.ajax({
+              type: 'GET',
+              url: 'https://api.spotify.com/v1/me/top/tracks',
+              contentType: 'application/json',
+              dataType: 'json',
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              },
+              data: {
+                'limit': limit,
+                'offset': offset,
+                'time_range': time_range
+              },
+              async: false,
+              success: function(result){
+                console.log(result);
+                for (var i = 0; i < limit; i++) {
+                  songs.push(result.items[i].id);
+                }
+                //getFeaturesTrack(songs[0]);
+              }
+            })
+            return songs;
+          }
+          
+          function writeToCSV(featureData) {
+            console.log(featureData);
+            const data = [];
+            var features = ['acousticness', 'danceability', 'energy', 'instrumentalness', 'liveness', 'speechiness', 'valence'];
+            data.push(features);
+            for (var i = 0; i < featureData.length; i++) {
+              var curTrack = [];
+              for (var j = 0; j < features.length; j++) {
+                curTrack.push(featureData[i][features[j]] * 1000);
+              }
+              data.push(curTrack);
+            }
+            
+            let csvContent = "data:text/csv;charset=utf-8,";
+
+            data.forEach(function(rowArray) {
+                let row = rowArray.join(",");
+                csvContent += row + "\r\n";
+            });
+            
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "my_data.csv");
+            document.body.appendChild(link); // Required for FF
+            link.click(); // This will download the data file named "my_data.csv".
+            
+            //console.log(data);
+            return data;
+          }
+
+          function getUserTopArtists() {
+            $.ajax({
+              type: 'GET',
+              url: 'https://api.spotify.com/v1/me/top/artists',
+              contentType: 'application/json',
+              dataType: 'json',
+              headers: {
+                'Authorization': 'Bearer ' + access_token
+              },
+              success: function(result){
+                  console.log(result);
+              }
+            })
+          }
+
+        }
+
+        document.getElementById('getTopSongs').addEventListener('click', function(event) {
+          var terms = ['short_term', 'medium_term', 'long_term'];
+          for (t in terms) {
+            var songs = getUserTopSongs(50, 0, terms[t]);
+            var featureData = getFeaturesTracks(songs);
+            //var csvData = writeToCSV(featureData);
+            var features = ['acousticness', 'danceability', 'energy', 'liveness', 'speechiness', 'valence'];
+            for (i in featureData) {
+              for (j in features) {
+                featureData[i][features[j]] = featureData[i][features[j]] * 1000;
+              }
+            }
+            graph(featureData, terms[t]);
+          }
+        }, false);
+      })();
+    </script>
+
+    <script>
+      function graph(data, term) {
+        //short_term_graph
+        console.log(data);
+
+        // set the dimensions and margins of the graph
+        var margin = {top: 80, right: 30, bottom: 50, left:110},
+            width = 500 - margin.left - margin.right,
+            height = 500 - margin.top - margin.bottom;
+
+        // append the svg object to the body of the page
+        var svg = d3.select("#" + term + "_graph")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform",
+                "translate(" + margin.left + "," + margin.top + ")");
+        
+        //read data
+        //d3.csv("C:/Users/maxin/Downloads/my_data.csv", function(data) {
+        //d3.csv("https://raw.githubusercontent.com/zonination/perceptions/master/probly.csv", function(data) {
+        
+        // Get the different categories and count them
+        var categories = ['acousticness', 'danceability', 'energy', 'liveness', 'speechiness', 'valence'];
+        var n = categories.length;
+        
+        // Compute the mean of each group
+        allMeans = []
+        for (i in categories) {
+            currentGroup = categories[i]
+            mean = d3.mean(data, function(d) { return +d[currentGroup] })
+            allMeans.push(mean)
+        }
+
+        console.log(allMeans);
+        
+        // Create a color scale using these means.
+        var myColor = d3.scaleSequential()
+            .domain([100,700])
+            .interpolator(d3.interpolateViridis);
+        
+        // Add X axis
+        var x = d3.scaleLinear()
+            .domain([-100, 1100])
+            .range([0, width]);
+        svg.append("g")
+            .attr("class", "xAxis")
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(x).tickValues([0,250, 500, 750, 1000]).tickSize(-height) )
+            .select(".domain").remove()
+        
+        // Add X axis label:
+        svg.append("text")
+            .attr("text-anchor", "end")
+            .attr("x", width)
+            .attr("y", height + 40)
+            .text("Probability (%)");
+        
+        // Create a Y scale for densities
+        var y = d3.scaleLinear()
+            .domain([0, 0.05])
+            .range([height, 0]);
+        
+        // Create the Y axis for names
+        var yName = d3.scaleBand()
+            .domain(categories)
+            .range([0, height])
+            .paddingInner(1)
+        svg.append("g")
+            .call(d3.axisLeft(yName).tickSize(0))
+            .select(".domain").remove()
+        
+        // Compute kernel density estimation for each column:
+        var kde = kernelDensityEstimator(kernelEpanechnikov(7), x.ticks(40)) // increase this 40 for more accurate density.
+        var allDensity = []
+        for (i = 0; i < n; i++) {
+            key = categories[i]
+            density = kde( data.map(function(d){  return d[key]; }) )
+            allDensity.push({key: key, density: density})
+        }
+        
+        // Add areas
+        svg.selectAll("areas")
+            .data(allDensity)
+            .enter()
+            .append("path")
+            .attr("transform", function(d){return("translate(0," + (yName(d.key)-height) +")" )})
+            .attr("fill", function(d){
+                grp = d.key ;
+                index = categories.indexOf(grp)
+                value = allMeans[index]
+                return myColor( value  )
+            })
+            .datum(function(d){return(d.density)})
+            .attr("opacity", 0.7)
+            .attr("stroke", "#000")
+            .attr("stroke-width", 0.1)
+            .attr("d",  d3.line()
+                .curve(d3.curveBasis)
+                .x(function(d) { return x(d[0]); })
+                .y(function(d) { return y(d[1]); })
+            )
+        
+        //})
+      }
+      
+      // This is what I need to compute kernel density estimation
+      function kernelDensityEstimator(kernel, X) {
+      return function(V) {
+          return X.map(function(x) {
+          return [x, d3.mean(V, function(v) { return kernel(x - v); })];
+          });
+      };
+      }
+      function kernelEpanechnikov(k) {
+      return function(v) {
+          return Math.abs(v /= k) <= 1 ? 0.75 * (1 - v * v) / k : 0;
+      };
+      }
+  </script>
+  <script>
+    var slideIndex = 1;
+showSlides(slideIndex);
+
+// Next/previous controls
+function plusSlides(n) {
+  showSlides(slideIndex += n);
+}
+
+// Thumbnail image controls
+function currentSlide(n) {
+  showSlides(slideIndex = n);
+}
+
+function showSlides(n) {
+  var i;
+  var slides = document.getElementsByClassName("mySlides");
+  var dots = document.getElementsByClassName("dot");
+  if (n > slides.length) {slideIndex = 1}
+  if (n < 1) {slideIndex = slides.length}
+  for (i = 0; i < slides.length; i++) {
+      slides[i].style.display = "none";
+  }
+  for (i = 0; i < dots.length; i++) {
+      dots[i].className = dots[i].className.replace(" active", "");
+  }
+  slides[slideIndex-1].style.display = "block";
+  dots[slideIndex-1].className += " active";
+}
+  </script>
+  </body>
+</html>
+
